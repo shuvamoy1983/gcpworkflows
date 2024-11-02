@@ -1,0 +1,50 @@
+# main.tf
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+resource "google_service_account" "workflow_sa" {
+  account_id   = "workflow-sa2"
+  display_name = "Workflow Service Account"
+}
+
+resource "google_project_iam_member" "bigquery_role" {
+  project = var.project_id
+  role    = "roles/bigquery.dataEditor"
+  member  = "serviceAccount:${google_service_account.workflow_sa.email}"
+}
+
+resource "google_project_iam_member" "storage_role" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.workflow_sa.email}"
+}
+
+resource "google_project_iam_member" "workflow_invoker_role" {
+  project = var.project_id
+  role    = "roles/workflows.invoker"
+  member  = "serviceAccount:${google_service_account.workflow_sa.email}"
+}
+
+resource "google_workflows_workflow" "load_data_workflow" {
+  name            = "load-data-workflow"
+  region          = var.region
+  service_account = google_service_account.workflow_sa.email
+
+  description = "Workflow to load data from GCS to BigQuery"
+
+  source_contents = templatefile("load_data_workflow.yaml", {
+    project_id = var.project_id,
+    bucket     = var.bucket,
+    file_name  = var.file_name,
+    dataset_id = var.dataset_id,
+    table_id   = var.table_id
+  })
+}
+
+output "workflow_name" {
+  value = google_workflows_workflow.load_data_workflow.name
+}
+

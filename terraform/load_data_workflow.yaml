@@ -1,0 +1,36 @@
+- init:
+    assign:
+      - resultsList: []
+      - projectId: ${args.projectId}
+      - datasetId: ${args.datasetId}
+      - tableId: ${args.tableId}
+      - bucketName: ${args.bucketName}
+      - fileName: ${args.fileName}
+      - gcs_path: ${"gs://" + bucketName + fileName}
+
+- insertAutoDetect:
+    call: googleapis.bigquery.v2.jobs.insert
+    args:
+      projectId: ${projectId}  # Referencing projectId from init step
+      body:
+        configuration:
+          load:
+            autodetect: true
+            destinationTable:
+              datasetId: ${datasetId}  # Referencing datasetId from init step
+              projectId: ${projectId}  # Referencing projectId from init step
+              tableId: ${tableId}  # Referencing tableId from init step
+            fieldDelimiter: ","
+            skipLeadingRows: 1
+            sourceFormat: "CSV"
+            sourceUris: ${gcs_path} # Referencing gcs_path as a list item
+            writeDisposition: "WRITE_TRUNCATE"
+    result: insertAutoDetectResult
+
+- appendInsertAutoDetectResult:
+    assign:
+      - resultsList: '${list.concat(resultsList, insertAutoDetectResult.status.state + " for " + insertAutoDetectResult.configuration.load.destinationTable.tableId)}'
+
+- returnOutput:
+    return: ${resultsList}
+
